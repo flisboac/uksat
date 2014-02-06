@@ -1,0 +1,12 @@
+c A SAT instance generated from a 6-CNF formula that had 10 clauses and 6 variables
+p cnf 6 10
+-4 3 6 1 2 5 0
+-6 -5 -1 -4 3 2 0
+1 -5 6 -2 -3 -4 0
+6 -5 -1 2 -4 -3 0
+-2 1 6 -4 5 3 0
+-6 -4 1 2 5 -3 0
+-4 -6 -2 -3 1 -5 0
+-1 -2 -3 6 -4 -5 0
+-1 4 -6 -2 5 3 0
+3 -2 1 5 -6 4 0

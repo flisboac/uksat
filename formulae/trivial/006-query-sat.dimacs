@@ -1,0 +1,5 @@
+c SATISFIABLE FORMULA: (~x \/ ~y) /\ (~y \/ ~z)
+
+p cnf 3 2
+-1 -2 0
+-2 -3 0
