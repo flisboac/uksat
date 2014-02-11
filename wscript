@@ -24,6 +24,7 @@ BUILDS = {
 			'load': 'compiler_cxx',
 			'find_program': [
 				{'filename': 'diff', 'mandatory': True},
+				{'filename': 'minisat', 'mandatory': True},
 			],
 			'includes': [inc, src, ext_include],
 			'cxxflags': [],#['-Wall'],
@@ -32,7 +33,13 @@ BUILDS = {
 
 		LIBNAME: {
 			'features': 'cxx cxxstlib',
-			'source': [src + '/map.cpp', src + '/dpll.cpp', src + '/cnf.cpp'],
+			'source': [
+                src + '/cnf.cpp',
+                src + '/map.cpp',
+                src + '/simple.cpp',
+                src + '/solver.cpp',
+                src + '/watched.cpp',
+            ],
 		},
 
 		APPNAME: {
@@ -50,24 +57,19 @@ BUILDS = {
 
 	'debug': {
 		LIBNAME: {
-			'target': LIBNAME + '_d',
-			'linkflags': ['-g', '-O1'],
+			'cxxflags': ['-g', '-O1'],
 		},
 	},
 
 	'release': {
 		'all': {
-			'linkflags': ['-O2']
+			'cxxflags': ['-O2']
 		}
 	},
 
 	'profile': {
 		'all': {
-			'linkflags': ['-pg', '-O2', '-g']
-		},
-
-		LIBNAME: {
-			'target': APPNAME + str(MAJOR) + '_p',
+			'cxxflags': ['-pg', '-O2', '-g']
 		},
 	}
 }
@@ -99,21 +101,19 @@ def configure(ctx):
 	ctx.load('wafbuild')
 	ctx.load('cnfexec')
 
-	ctx.find_program('minisat', mandatory=True)
-	ctx.find_program('gnuplot', mandatory=True)
-
 
 def build(ctx):
 	ctx.load('wafbuild')
 	ctx.load('cnfexec')
 
 
-def distclean(ctx):
-	import shutil
-	pycache_node = ctx.path.find_node('__pycache__')
-	shutil.rmtree(pycache_node.abspath())
-	for node in ctx.path.ant_glob('*.log'):
-		node.delete()
+#def distclean(ctx):
+#	import shutil
+#	pycache_node = ctx.path.find_node('__pycache__')
+#	shutil.rmtree(pycache_node.abspath())
+#	for node in ctx.path.ant_glob('*.log'):
+#		node.delete()
+#	ctx.execute()
 
 
 class BatchContext(BuildContext):

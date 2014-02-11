@@ -6,7 +6,6 @@
 #include <ctime>
 #include <locale>
 #include "uksat.hpp"
-#include "watched.hpp"
 #include "ezOptionParser.hpp"
 
 // Exit codes
@@ -139,6 +138,8 @@ int main(int argc, const char** argv) {
 	setupopts(arg);
 	arg.optparser.parse(argc, argv);
     
+    std::set_terminate(__gnu_cxx::__verbose_terminate_handler);
+    
 	if ( arg.isset(HELP) ) {
 		printhelp(arg);
 		return RETOK;
@@ -152,10 +153,14 @@ int main(int argc, const char** argv) {
 		bool keepgoing = true;
         int sat = 0;
 		uksat::CnfFormula cnf;
-        uksat::DpllSolver solver(cnf, arg.watchinglits);
+        uksat::SimpleDpllSolver simplesolver(cnf);
+        uksat::WatchedDpllSolver watchedsolver(cnf);
+        uksat::Solver& solver = arg.watchinglits ? watchedsolver : simplesolver;
         
 		// Setting configuration
         if (arg.maxtime) solver.setmaxtime(static_cast<double>(arg.maxtime));
+        if (arg.isverbose()) solver.setlogstream(std::cerr);
+        if (arg.isdebug()) solver.addlogtype(uksat::LOG_ALL);
         
 		// Input and output
 		std::istream* is = NULL;
@@ -414,17 +419,17 @@ int evalresult(ArgState& arg, uksat::Solver& solver) {
     int ret = RETUNDEF;
     const char* str = "UNDEFINED";
     
-    if (solver.issatisfied()) {
+    if (solver.hastimeout()) {
+        ret = RETTIMEOUT;
+        str = "TIMEOUT";
+        
+    } else if (solver.issatisfied()) {
         ret = RETSAT;
         str = "SATISFIABLE";
         
     } else if (solver.isconflicting()) {
         ret = RETUNSAT;
         str = "UNSATISFIABLE";
-        
-    } else if (solver.hastimeout()) {
-        ret = RETTIMEOUT;
-        str = "TIMEOUT";
     }
     
     arg.exitcode = ret;

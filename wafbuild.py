@@ -8,7 +8,7 @@ def options(ctx):
 	ctx.add_option('-B', '--build', action='store', default="release",
 		help='Specifies which build to run.')
 	ctx.add_option('--list-builds', action='store_true',
-		help='Lists all available builds and their targets.')
+		help='Lists all available builds and their targets (NOT IMPLEMENTED YET).')
 	target = _get_all_all_target(ctx)
 	tools = _get_tools(ctx, {'all': target})
 	#help(ctx.load)
@@ -20,9 +20,9 @@ def options(ctx):
 def configure(ctx):
 	targets = _get_build_targets(ctx, include_all = False)
 	tools = _get_tools(ctx, targets)
-	#for targetname in targets:
-		#print(targetname, targets[targetname])
-		#print()
+	for targetname in targets:
+		print(targetname, targets[targetname])
+		print()
 	programs = _get_programs(ctx, targets)
 	#help(ctx.load)
 	for tool in tools:
@@ -30,13 +30,14 @@ def configure(ctx):
 		ctx.load(tool['tool'])
 	for program in programs:
 		ctx.find_program(**program)
+	ctx.env.build = ctx.options.build
 
 
 def build(ctx):
 	targets = _get_build_targets(ctx)
 	for targetname in targets:
-		#print(targetname, targets[targetname])
-		#print()
+		print(targetname, targets[targetname])
+		print()
 		ctx(**targets[targetname])
 
 
