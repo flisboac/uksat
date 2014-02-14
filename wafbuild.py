@@ -11,22 +11,15 @@ def options(ctx):
 		help='Lists all available builds and their targets (NOT IMPLEMENTED YET).')
 	target = _get_all_all_target(ctx)
 	tools = _get_tools(ctx, {'all': target})
-	#help(ctx.load)
 	for tool in tools:
-		#print(tool)
 		ctx.load(tool['tool'], **tool)
 
 
 def configure(ctx):
 	targets = _get_build_targets(ctx, include_all = False)
 	tools = _get_tools(ctx, targets)
-	for targetname in targets:
-		print(targetname, targets[targetname])
-		print()
 	programs = _get_programs(ctx, targets)
-	#help(ctx.load)
 	for tool in tools:
-		#print(tool)
 		ctx.load(tool['tool'])
 	for program in programs:
 		ctx.find_program(**program)
@@ -36,8 +29,6 @@ def configure(ctx):
 def build(ctx):
 	targets = _get_build_targets(ctx)
 	for targetname in targets:
-		print(targetname, targets[targetname])
-		print()
 		ctx(**targets[targetname])
 
 
@@ -45,7 +36,6 @@ def _get_list(ctx, targets, key, defaultkey):
 	values = {}
 	for targetname in targets:
 		target = targets[targetname]
-		#print(target)
 		valuelist = target.get(key, [])
 		if type(valuelist) is list or type(valuelist) is tuple:
 			for value in valuelist:
@@ -105,11 +95,8 @@ def _get_build_targets(ctx, buildname = None, include_all = False):
 	for targetname in allbuilddata: targetnames.add(targetname)
 	for targetname in targetbuilddata: targetnames.add(targetname)
 	for targetname in targetnames:
-		#target = _get_build_target(ctx, targetname, buildname)
-		#print(targetname, target)
 		if include_all or targetname != 'all':
 			targets[targetname] = _get_build_target(ctx, targetname, buildname)
-			#print(targets[targetname])
 	return targets
 
 

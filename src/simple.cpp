@@ -99,7 +99,7 @@ uksat::SimpleDpllSolver::propagate() {
         
         uksat_LOG_(LOG_PROPAG_SAT,
             "sat = " << truth
-            << ", restarts = " << count
+            << ", nloops = " << count
             << ", propagated = " << propagated);
         count++;
     } while (propagated);
@@ -149,7 +149,7 @@ uksat::SimpleDpllSolver::push(int var, bool decision) {
     } else {
         propagations.push_back(std::pair<int, int>(var, currtime()));
     }
-    partial.assign(var);
+    partial.push(var, currvar() < 0 ? -currtime() : currtime());
 }
 
 
@@ -209,12 +209,14 @@ int
 uksat::SimpleDpllSolver::propagateclause(std::size_t clauseidx) {
     int clausesat = -1;
     int undefvar = 0;
+    int nundefs = 0;
     std::vector<int>::const_iterator iv = formula[clauseidx].begin();
     
-    while ((clausesat < 0) && iv != formula[clauseidx].end()) {
+    while ((clausesat <= 0) && iv != formula[clauseidx].end()) {
         int var = *iv;
         int vartruth = partial.sat(var);
         if (!vartruth) {
+            nundefs++;
             if (undefvar) {
                 clausesat = 0;
                 undefvar = 0;
@@ -227,7 +229,7 @@ uksat::SimpleDpllSolver::propagateclause(std::size_t clauseidx) {
         iv++;
     }
     
-    if (undefvar) {
+    if (nundefs == 1 && undefvar) {
         uksat_LOG_(LOG_PROPAG_UNIT,
             "clauseidx = " << clauseidx
             << ", deducedvar = " << undefvar);

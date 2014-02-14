@@ -244,23 +244,31 @@ int
 uksat::Solver::checkclause(std::size_t clauseidx) {
     int clausesat = -1;
     int undefvar = 0;
+    int nunsats = 0;
+    
     std::vector<int>::const_iterator iv = formula[clauseidx].begin();
-    while ((clausesat < 0) && iv != formula[clauseidx].end()) {
+    while ((clausesat <= 0) && iv != formula[clauseidx].end()) {
         int var = *iv;
         int vartruth = partial.sat(var);
+        
         if (!vartruth) {
+            nunsats++;
+            
             if (undefvar) {
                 clausesat = 0;
                 undefvar = 0;
             } else
                 undefvar = var;
+            
         } else if (vartruth > 0) {
             clausesat = 1;
             undefvar = 0;
         }
+        
         iv++;
     }
-    if (undefvar) clausesat = 2;
+    
+    if (nunsats == 1 && undefvar) clausesat = 2;
     return clausesat;
 }
 

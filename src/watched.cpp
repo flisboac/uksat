@@ -128,10 +128,7 @@ std::pair<int, int> uksat::WatchedDpllSolver::findwatchvars(std::size_t clauseid
     std::pair<int, int> vars(0, 0), truevars(0, 0), undefvars(0, 0);
     std::vector<int>::const_iterator iv = formula[clauseidx].begin();
     
-    while (iv != formula[clauseidx].end()
-            && ((knownvar && (!truevars.first || !undefvars.first)
-                || (!truevars.second || !undefvars.second))
-            )) {
+    while (iv != formula[clauseidx].end()) {
         int var = *iv;
         
         if (var != knownvar) {
@@ -147,14 +144,23 @@ std::pair<int, int> uksat::WatchedDpllSolver::findwatchvars(std::size_t clauseid
             }
         }
         
+        if (undefvars.second || truevars.second) break;
+#if 0
+        if (knownvar) {
+            if (undefvars.first || truevars.first) break;
+        } else {
+            if (undefvars.second || truevars.second) break;
+        }
+#endif   
         iv++;
     }
     
-    vars.first = (undefvars.first ? undefvars.first : truevars.first);
-    vars.second = (undefvars.second ? undefvars.second : truevars.second);
+    vars = undefvars;
     if (!vars.first) {
-        vars.first = vars.second;
-        vars.second = 0;
+        vars = truevars;
+        
+    } else if (!vars.second) {
+        vars.second = truevars.first;
     }
     
     return vars;
@@ -272,6 +278,7 @@ void uksat::WatchedDpllSolver::trigger(int var) {
     int invvar = uksat_INVERTLIT(var);
     std::set<std::size_t>& watchset = getwatchset(var);
     std::set<std::size_t>& invwatchset = getinvwatchset(var);
+    std::size_t nloops = 0;
     
     uksat_LOG_(LOG_TRIGGER_PRE,
         "var = " << var
@@ -284,8 +291,8 @@ void uksat::WatchedDpllSolver::trigger(int var) {
         std::size_t clauseidx = *it;
         if (!isvalidclausesat(clauseidx)) {
             uksat_LOG_(LOG_PROPAG_CLAUSE,
-                "sat = 1"
-                << ", clauseidx = " << clauseidx
+                " clauseidx = " << clauseidx
+                << ", clausesat = 1"
                 << ", var = " << var
                 << ", currtime = " << currtime()
             );
@@ -297,6 +304,7 @@ void uksat::WatchedDpllSolver::trigger(int var) {
     std::set<std::size_t>::iterator it = invwatchset.begin();
     while (it != invwatchset.end()) {
         std::size_t clauseidx = *it;
+        nloops++;
 
         // Take the two var watches registered for the clause currently being notified
         std::pair<int, int>& cwatch = getclausewatches(clauseidx);
@@ -342,6 +350,56 @@ void uksat::WatchedDpllSolver::trigger(int var) {
                 << ", othervar = " << *potherpos
             );
             watch(clauseidx, vars.first, *pwatchpos);
+            int newvartruth = partial.sat(vars.first);
+            
+            if (newvartruth > 0) {
+                if (!isvalidclausesat(clauseidx)) {
+                    int assigntime = partial.gettime(*potherpos);
+                    uksat_LOG_(LOG_PROPAG_CLAUSE, 
+                        " clauseidx = " << clauseidx
+                        << ", clausesat = 1"
+                        << ", triggervar = " << var
+                        << ", invtriggervar = " << invvar
+                        << ", watchidx = " << posidx
+                        << ", watchvar = " << *pwatchpos
+                        << ", assigntime = " << assigntime
+                        << ", watches = {" << cwatch.first << ", " << cwatch.second << "}"
+                    );
+                    setclausesat(clauseidx, assigntime);
+                }
+                
+            } else if (newvartruth < 0) {
+                // Something is wrong...
+                uksat_LOG_(LOG_TRIGGER_STRANGE, "NewWatchVarNotWatchable"
+                    << " clauseidx = " << clauseidx
+                    << ", triggervar = " << var
+                    << ", invtriggervar = " << invvar
+                    << ", watchidx = " << posidx
+                    << ", watchvar = " << *pwatchpos
+                    << ", watches = {" << cwatch.first << ", " << cwatch.second << "}"
+                );
+                throw std::exception();
+                
+            } else {
+                if (!vars.second) {
+                    int secondvartruth = partial.sat(*potherpos);
+                    
+                    if (secondvartruth < 0) {
+                        // The only other variable found was an unassigned one. This
+                        // means that this variable is the only one eligible for
+                        // watching. In other words, all other variables are false,
+                        // and therefore, can be propagated.
+                        uksat_LOG_(LOG_PROPAG_UNIT,
+                            "clauseidx = " << clauseidx
+                            << ", deducedvar = " << vars.first
+                            << ", watchidx = " << posidx
+                            << ", watchvar = " << *pwatchpos
+                        );
+                        eraseclausesat(clauseidx); // The assignment will be done on the next push
+                        push(vars.first);
+                    }
+                }
+            }
             it = invwatchset.begin();
             continue;
             
@@ -356,23 +414,32 @@ void uksat::WatchedDpllSolver::trigger(int var) {
                     << ", watchvar = " << *pwatchpos
                     << ", othervar = " << *potherpos
                 );
+                uksat_LOG_(LOG_PROPAG_SAT,
+                    "sat = -1"
+                    << ", nloops = " << nloops
+                    << ", propagated = 0"
+                    << ", clauseidx = " << clauseidx
+                    << ", watchidx = " << posidx
+                    << ", watchvar = " << *pwatchpos
+                    << ", othervar = " << *potherpos
+                );
                 eraseclausesat(clauseidx);
                 finish(-1);
                 
-            } else if (vartruth > 0) {
-                // NOP
+            } else if (vartruth > 0) {                
                 if (!isvalidclausesat(clauseidx)) {
+                    // Should NOT happen!
+                    int assigntime = partial.gettime(*potherpos);
                     uksat_LOG_(LOG_TRIGGER_STRANGE, "ClauseShouldBeSat"
                         "clauseidx = " << clauseidx
                         << ", triggervar = " << var
                         << ", invtriggervar = " << invvar
                         << ", watchidx = " << posidx
                         << ", watchvar = " << *pwatchpos
+                        << ", assigntime = " << assigntime
                         << ", watches = {" << cwatch.first << ", " << cwatch.second << "}"
                     );
-                    // Happens when the clause is unit and a new variable
-                    // is pushed. Should not happen.
-                    setclausesat(clauseidx);
+                    setclausesat(clauseidx, assigntime);
                 }
                 
             } else {
@@ -447,13 +514,26 @@ bool uksat::WatchedDpllSolver::isvalidclausesat(std::size_t clauseidx) {
 }
 
 
-void uksat::WatchedDpllSolver::setclausesat(std::size_t clauseidx) {
+void uksat::WatchedDpllSolver::setclausesat(std::size_t clauseidx, int time) {
     ClauseState& cstate = cstates[clauseidx];
+    
     if (!cstate.satisfied) {
         cstate.satisfied = true;
-        cstate.sattime = currvar() < 0 ? -currtime() : currtime();
+        if (!time) time = (currvar() < 0 ? -currtime() : currtime());
+        cstate.sattime = time;
         nsatclauses++;
+        
+    } else if (time) {
+        cstate.satisfied = true;
+        cstate.sattime = time;
     }
+    
+    uksat_LOG_(LOG_ASSIGN_CLAUSE,
+        "sat = 1"
+        << ", clauseidx = " << clauseidx
+        << ", time = " << time
+        << ", nsatclauses = " << nsatclauses
+    );
 }
 
 
@@ -463,6 +543,12 @@ void uksat::WatchedDpllSolver::eraseclausesat(std::size_t clauseidx) {
         cstate.satisfied = false;
         cstate.sattime = 0;
         nsatclauses--;
+        uksat_LOG_(LOG_ASSIGN_CLAUSE,
+            "sat = 0"
+            << ", clauseidx = " << clauseidx
+            << ", time = " << time
+            << ", nsatclauses = " << nsatclauses
+        );
     }
 }
 

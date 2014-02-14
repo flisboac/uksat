@@ -70,6 +70,10 @@ enum LogTypeId {
         LOG_STACK_POP,
         LOG_STACK_POPVAR,
         
+    // Map/Clause assignments
+    LOG_ASSIGN,
+        LOG_ASSIGN_CLAUSE,
+        
     // Watched Literals
     LOG_WATCH,
         LOG_WATCH_PRE,
@@ -139,6 +143,9 @@ static const LogType LogTypes[] = {
         LogType(LOG_STACK_POP, false, LOG_STACK, "poppre", "    POP "),
         LogType(LOG_STACK_POP, false, LOG_STACK, "pop", "    POP "),
         LogType(LOG_STACK_POPVAR, false, LOG_STACK, "popvar", "    POP.VAR "),
+    
+    LogType(LOG_ASSIGN, true, LOG_NONE, "assign", NULL),
+        LogType(LOG_ASSIGN_CLAUSE, false, LOG_ASSIGN, "assignclause", "    ASSIGN.CLAUSE "),
     
     LogType(LOG_WATCH, true, LOG_NONE, "watch", NULL),
         LogType(LOG_WATCH_PRE, false, LOG_WATCH, "watchpre", "... WATCH "),
@@ -210,11 +217,12 @@ private:
 
 struct PartialMap {
     struct Entry {
-        int val;
+        int truth;
+        int truthtime;
         std::set<std::size_t> tclauses;
         std::set<std::size_t> fclauses;
-        Entry() : val(0) {}
-        Entry(const Entry& other) : val(other.val), tclauses(other.tclauses), fclauses(other.fclauses) { }
+        Entry() : truth(0), truthtime(0) {}
+        Entry(const Entry& other) : truth(other.truth), truthtime(other.truthtime), tclauses(other.tclauses), fclauses(other.fclauses) { }
     };
     
     // Constructors
@@ -230,14 +238,15 @@ struct PartialMap {
 
     // Operations
     void clear();
-    void assign(int var, int truth);
-    void assign(int var, bool truth);
-    void assign(int var);
+    void assign(int var, int truth, int time = 0);
+    void assign(int var, bool truth, int time = 0);
+    void push(int var, int time = 0);
     void unassign(int var);
     int  normalizelit(int var) const;
     bool isassigned(int var) const;
     bool istrue(int var) const;
     bool isfalse(int var) const;
+    int gettime(int normvar);
     bool get(int var) const;
     int  sat(int var) const;
     void copy(std::map<int, bool>& other) const;
@@ -364,7 +373,7 @@ protected:
     
     virtual bool isvalidtime(int assigntime);
     virtual bool isvalidclausesat(std::size_t clauseidx);
-    virtual void setclausesat(std::size_t clauseidx);
+    virtual void setclausesat(std::size_t clauseidx, int time = 0);
     virtual void eraseclausesat(std::size_t clauseidx);
     virtual std::pair<int, int>& getclausewatches(std::size_t clauseidx);
     virtual std::set<std::size_t>& getwatchset(int var);

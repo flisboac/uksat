@@ -9,14 +9,18 @@ GnuPlotData = {
 	'xwinx': 450,
 	'xwiny': 50,
 	'xmin': 0.0,
-	'xmax': 10.0,
+	'xmax': 0.0,
 	'ymin': 0.0,
-	'ymax': 10.0,
+	'ymax': 0.0,
 	'plotname': "Speed Improvements' Benchmark for Watched Literals",
 	'datafilename': "plot.dat",
 	'outfilename': "plot.png",
 	'xwins': 0,
-	'ywins': 0
+	'ywins': 0,
+	'nfails': 0,
+	'fails': [],
+	'wins': [],
+	'passes': [],
 }
 
 
@@ -29,8 +33,71 @@ set xlabel "normal timings (seconds)"
 set ylabel "watchedlits timings (seconds)"
 set label 1 "watchedlits > normal for %(ywins)d runs" at %(ywinx)d, %(ywiny)d
 set label 2 "normal > watchedlits for %(xwins)d runs" at %(xwinx)d, %(xwiny)d
+set datafile sep ';'
 plot [%(xmin)f:%(xmax)f][%(ymin)f:%(ymax)f] x, '%(datafilename)s' using 1:2 ti '%(datafilename)s'
 """
+
+def _getplotstats(complist):
+	from copy import copy
+	stats = copy(GnuPlotData)
+	for comp in complist:
+		# If it's not a good result, abort
+		if comp.isbad():
+			stats['nfails'] += 1
+			stats['fails'].append(comp)
+			break
+		elif comp.iswin():
+			stats['ywins'] += 1
+			stats['wins'].append(comp)
+		elif comp.ispass():
+			stats['xwins'] += 1
+			stats['passes'].append(comp)
+
+		# Min/Max for optrunner
+		if not stats['ymin'] or stats['ymin'] > comp.optrunner.time:
+			stats['ymin'] = comp.optrunner.time
+		if not stats['ymax'] or stats['ymax'] < comp.optrunner.time:
+			stats['ymax'] = comp.optrunner.time
+		stats['ymin'] -= stats['ymin'] / 3
+		stats['ymax'] += stats['ymax'] / 3
+
+		# Min/Max for chkrunner
+		if not stats['xmin'] or stats['xmin'] > comp.chkrunner.time:
+			stats['xmin'] = comp.chkrunner.time
+		if not stats['xmax'] or stats['xmax'] < comp.chkrunner.time:
+			stats['xmax'] = comp.chkrunner.time
+		stats['xmin'] -= stats['xmin'] / 3
+		stats['xmax'] += stats['xmax'] / 3
+
+
+	return stats
+
+
+def _writecsv(filename, stats):
+	with open(filename, 'w') as f:
+		_writecsvfile(f, stats)
+
+
+def _writecsvfile(f, stats):
+	f.write("# chktime; opttime; deltatime; optcode; chkcode; filename\n")
+	for comp in stats['wins'] + stats['passes']:
+		f.write("%f; %f; %f; %d; %d; %s\n" % (
+			comp.optrunner.time,
+			comp.chkrunner.time,
+			comp.deltatime,
+			comp.optrunner.exitcode,
+			comp.chkrunner.exitcode,
+			comp.inputpath)
+		)
+
+
+def _writeplottpl(filename, stats):
+	with open(filename, 'w') as f:
+		_writeplottplfile(f, stats)
+
+
+def _writeplottplfile(f, stats):
+	f.write(GnuPlotTemplate % stats)
 
 
 class Runner(object):
@@ -390,7 +457,7 @@ class RunnerBatch(object):
 		self.pathnames = pathnames
 		self.options = options
 		self.reader = cnfstat.FastCnfReader(*pathnames, **options)
-		self.formulae = list(self.reader.formulae) # kinda implicit, but formulae sorting happens here
+		self.formulae = self.reader.formulae
 		self.formulae.sort()
 		self.results = {
 			'timelimits': [0, 0],
@@ -400,6 +467,7 @@ class RunnerBatch(object):
 		}
 		self.maxrunners = options.get('maxrunners', 1)
 	def run(self):
+		self.runners = []
 		totalformulae = len(self.formulae)
 		formulaidx = 0
 		runners = []
@@ -425,10 +493,15 @@ class RunnerBatch(object):
 				for finished_runner in finished_runners:
 					runners.remove(finished_runner)
 					self.onfinishedrunner(finished_runner)
+					self.runners.append(finished_runner)
 			time.sleep(0.1)
 	def onfinishedrunner(self, runner):
 		if 'onfinishedrunner' in self.options:
 			return self.options['onfinishedrunner'](runner)
+	def writeplotfiles(self):
+		stats = _getplotstats(self.runners)
+		_writecsv(stats['datafilename'], stats)
+		_writeplottpl(stats['plotfilename'], stats)
 
 
 if __name__ == '__main__':

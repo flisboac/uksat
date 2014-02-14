@@ -45,58 +45,66 @@ void uksat::PartialMap::clear() {
 }
 
 
-void uksat::PartialMap::assign(int var, int truth) {
+void uksat::PartialMap::assign(int var, int truth, int time) {
     int idx = uksat_NORMALLIT(var) - 1;
-    int val = map[idx].val;
+    int val = map[idx].truth;
     if (val && !truth) mapsize--;
     if (!val && truth) mapsize++;
+    map[idx].truthtime = time;
     //std::cerr << "ASSIGN var = " << (idx + 1) << ", truth = " << truth << std::endl;
-    map[idx].val = truth;
+    map[idx].truth = truth;
 }
 
 
-void uksat::PartialMap::assign(int var, bool truth) {
-    assign(var, truth ? 1 : -1);
+void uksat::PartialMap::assign(int var, bool truth, int time) {
+    assign(var, truth ? 1 : -1, time);
 }
 
 
-void uksat::PartialMap::assign(int var) {
-    assign(var, var < 0 ? -1 : 1);
+void uksat::PartialMap::push(int var, int time) {
+    assign(var, var < 0 ? -1 : 1, time);
 }
 
 
 void uksat::PartialMap::unassign(int var) {
-    assign(var, 0);
+    assign(var, 0, 0);
 }
 
 
 bool uksat::PartialMap::isassigned(int var) const {
     int normalizedlit = uksat_NORMALLIT(var);
-    return normalizedlit-- ? !!map[normalizedlit].val : false;
+    return normalizedlit-- ? !!map[normalizedlit].truth : false;
 }
 
 
 bool uksat::PartialMap::istrue(int var) const {
     int normalizedlit = uksat_NORMALLIT(var);
-    return normalizedlit-- ? uksat_BOOLVAL(var, map[normalizedlit].val) : false;
+    return normalizedlit-- ? uksat_BOOLVAL(var, map[normalizedlit].truth) : false;
 }
 
 
 bool uksat::PartialMap::isfalse(int var) const {
     int normalizedlit = uksat_NORMALLIT(var);
-    return normalizedlit-- ? !uksat_BOOLVAL(var, map[normalizedlit].val) : false;
+    return normalizedlit-- ? !uksat_BOOLVAL(var, map[normalizedlit].truth) : false;
+}
+
+
+int
+uksat::PartialMap::gettime(int normvar) {
+    int normalizedlit = uksat_NORMALLIT(normvar);
+    return normalizedlit-- ? map[normalizedlit].truthtime : 0;
 }
 
 
 bool uksat::PartialMap::get(int var) const {
     int normalizedlit = uksat_NORMALLIT(var);
-    return normalizedlit-- && map[normalizedlit].val ? uksat_BOOLVAL(var, map[normalizedlit].val) : false;
+    return normalizedlit-- && map[normalizedlit].truth ? uksat_BOOLVAL(var, map[normalizedlit].truth) : false;
 }
 
 
 int uksat::PartialMap::sat(int var) const {
     int normalizedlit = uksat_NORMALLIT(var);
-    return normalizedlit-- && map[normalizedlit].val ? uksat_NORMALVAL(var, map[normalizedlit].val) : 0;
+    return normalizedlit-- && map[normalizedlit].truth ? uksat_NORMALVAL(var, map[normalizedlit].truth) : 0;
     
 }
 

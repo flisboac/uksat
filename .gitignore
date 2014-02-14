@@ -14,6 +14,7 @@ build
 *.bz2
 *.out
 
+plot.*
 nbproject
 .settings
 .*project

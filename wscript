@@ -25,6 +25,7 @@ BUILDS = {
 			'find_program': [
 				{'filename': 'diff', 'mandatory': True},
 				{'filename': 'minisat', 'mandatory': True},
+				{'filename': 'gnuplot', 'mandatory': True},
 			],
 			'includes': [inc, src, ext_include],
 			'cxxflags': [],#['-Wall'],
@@ -150,6 +151,8 @@ def batch(ctx):
 		print("* Found %d formulae. Starting batch tests..." % len(runnerbatch.formulae))
 		print()
 		runnerbatch.run()
+		print("* Writing result (plot) files...")
+		runnerbatch.writeplotfiles()
 		print("* Finished.")
 	except KeyboardInterrupt:
 		ctx.uksat_node.delete()
@@ -163,8 +166,16 @@ class GraphContext(BuildContext):
 	cmd = 'graph'
 	fun = 'graph'
 def graph(ctx):
-	import cnfstat
-	formulae = set(cnfstat.CnfReader(ctx.options.folder).formulae)
+	from cnfexec import GnuPlotData
+	from os import path
+	import subprocess
+	plotfilename = path.abspath(GnuPlotData['plotfilename'])
+	if not path.exists(plotfilename):
+		ctx.fatal("Please run `waf batch` first.")
+	gnu_proc = subprocess.Popen([ctx.env.GNUPLOT, plotfilename])
+	gnu_proc.wait()
+	if gnu_proc.returncode:
+		ctx.fatal("ERROR: Could not create graphic!")
 
 
 def _printrunner(ctx, runner):

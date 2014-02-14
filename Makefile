@@ -4,9 +4,9 @@ TEE=tee
 TIMESTAMP=date +%Y%m%d-%H%M%S
 
 DIR=./formulae
-LIMIT=300
+LIMIT=600
 JOBS=10
-MODE=vw
+MODE=vwu
 
 all: build
 
@@ -27,3 +27,6 @@ build: configure
 
 batch:
 	$(WAF) batch -F $(DIR) -L $(LIMIT) -j $(JOBS) -M $(MODE) | $(TEE) batch-$(shell $(TIMESTAMP)).log 
+
+graph:
+	$(WAF) graph
