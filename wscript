@@ -84,8 +84,10 @@ def options(ctx):
 	ctx.load('wafbuild')
 	ctx.load('cnfexec')
 
+	ctx.add_option('-O', '--output', action='store', default='-',
+		help='Specifies the output file or folder.')
 	ctx.add_option('-F', '--folder', action='store', default="formulae",
-		help='Specifies the folder containing formulae for batch tests.')
+		help='Specifies the input file, or folder containing formulae for batch tests.')
 	ctx.add_option('-R', '--runs', action='store', default=1, type='int',
 		help='Specifies how many runs will be done over the inputs while generating stats.')
 	ctx.add_option('-C', '--maxclauses', action='store', default=0, type='int',
@@ -123,8 +125,12 @@ class BatchContext(BuildContext):
 def batch(ctx):
 	import cnfexec
 	from cnfexec import RunnerBatch, UksatRunner, UksatNowatchRunner, MinisatRunner
+	from cnfexec import GnuPlotData
+	from os import path
+	datafilename = path.abspath(GnuPlotData['datafilename'])
 	dirpath = ctx.options.folder
 	_copy_uksat(ctx)
+	f = open(datafilename, 'w')
 	try:
 		options = {
 			'timelimit': ctx.options.timelimit,
@@ -150,16 +156,16 @@ def batch(ctx):
 		runnerbatch = RunnerBatch(dirpath, **options)
 		print("* Found %d formulae. Starting batch tests..." % len(runnerbatch.formulae))
 		print()
+		runnerbatch.datafile = f
 		runnerbatch.run()
 		print("* Writing result (plot) files...")
 		runnerbatch.writeplotfiles()
 		print("* Finished.")
 	except KeyboardInterrupt:
-		ctx.uksat_node.delete()
 		print("* Interrupted!")
-	except:
+	finally:
 		ctx.uksat_node.delete()
-		raise
+		f.close()
 
 
 class GraphContext(BuildContext):
@@ -176,6 +182,123 @@ def graph(ctx):
 	gnu_proc.wait()
 	if gnu_proc.returncode:
 		ctx.fatal("ERROR: Could not create graphic!")
+
+
+def parselog_full(ctx):
+	import re
+	import os, sys
+	good_pat = re.compile(r"WIN|PASS")
+	win_pat = re.compile(r"WIN")
+	pass_pat = re.compile(r"PASS")
+	filename_pat = re.compile(r"^\[(\d+)/(\d+) nc:(\d+), nv:(\d+), cs:(\d+)..(\d+)\]\s+(.*)$")
+	results_pat = re.compile(r"^\s*([\w,\s]+)\s+delta = (.*?), \[uksat = ([TF*!?]) \((\d+), (.*?)s\), nowatch = ([TF*!?]) \((\d+), (.*?)s\), minisat = ([TF*!?]) \((\d+), (.*?)s\)\]\s*$")
+	filename_match = None
+	runlist = []
+	with open(ctx.options.folder) as inputf:
+		for line in inputf.readlines():
+			if filename_match:
+				results_match = results_pat.match(line)
+				if results_match:
+					rundata = {
+						'formulaidx': int(filename_match.group(1)),
+						'totalformulae': int(filename_match.group(2)),
+						'nclauses': int(filename_match.group(3)),
+						'nvars': int(filename_match.group(4)),
+						'minclausesize': int(filename_match.group(5)),
+						'maxclausesize': int(filename_match.group(6)),
+						'filename': filename_match.group(7),
+
+						'resultstr': results_match.group(1),
+						'deltatime': float(results_match.group(2)),
+						'uksat': {
+							'resultstr': results_match.group(3),
+							'exitcode': int(results_match.group(4)),
+							'time': float(results_match.group(5)),
+						},
+						'nowatch': {
+							'resultstr': results_match.group(6),
+							'exitcode': int(results_match.group(7)),
+							'time': float(results_match.group(8)),
+						},
+						'minisat': {
+							'resultstr': results_match.group(9),
+							'exitcode': int(results_match.group(10)),
+							'time': float(results_match.group(11)),
+						},
+					}
+					runlist.append(rundata)
+					filename_match = None
+				else:
+					ctx.fatal("Something went wrong, check me!\nfilename_line: \"%s\"\nline:\"%s\"" % (filename_line, line))
+			else:
+				filename_match = filename_pat.match(line)
+				if filename_match: 
+					filename_line = line
+				else:
+					filename_line = None			
+	is_std = not ctx.options.output or ctx.options.output == "-"
+	if is_std:
+		outputf = sys.stdout
+	else:
+		outputf = open(ctx.options.output, "w")	
+	plot_data = {
+		'nwins': 0,
+		'npasses': 0,
+		'pmin': 0,
+		'pmax': 0,
+	}
+	try:
+		for rundata in runlist:
+			if good_pat.search(rundata['resultstr']):
+				outputf.write("%f; %f; %f; %d; %d; %s\n" % (
+					rundata['nowatch']['time'],
+					rundata['uksat']['time'],
+					rundata['deltatime'],
+					rundata['uksat']['exitcode'],
+					rundata['nowatch']['exitcode'],
+					rundata['filename'])
+				)
+				if not plot_data['pmin'] or plot_data['pmin'] > rundata['uksat']['time']:
+					plot_data['pmin'] = rundata['uksat']['time']
+				if not plot_data['pmin'] or plot_data['pmin'] > rundata['nowatch']['time']:
+					plot_data['pmin'] = rundata['nowatch']['time']
+				if not plot_data['pmax'] or plot_data['pmax'] < rundata['uksat']['time']:
+					plot_data['pmax'] = rundata['uksat']['time']
+				if not plot_data['pmax'] or plot_data['pmax'] < rundata['nowatch']['time']:
+					plot_data['pmax'] = rundata['nowatch']['time']
+			if win_pat.search(rundata['resultstr']):
+				plot_data['nwins'] += 1
+			elif pass_pat.search(rundata['resultstr']):
+				plot_data['npasses'] += 1
+	finally:
+		if not is_std:
+			outputf.close()
+	if ctx.options.cmpmode:
+		with open(ctx.options.cmpmode, "w") as plotf:
+			base_contents = """
+set title "Speed Improvements' Benchmark for Watched Literals"
+unset key
+set xlabel "normal timings (seconds)"
+set ylabel "watchedlits timings (seconds)"
+set label 1 "watchedlits > normal for %(nwins)d runs" at 50, 450
+set label 2 "normal > watchedlits for %(npasses)d runs" at 450, 50
+set datafile sep ';'
+plot [%(pmin)f:%(pmax)f][%(pmin)f:%(pmax)f] x, 'plot.dat' using 1:2 ti 'plot.dat'
+""" % plot_data
+			svg_contents = """
+#set terminal canvas  solid butt size 1000,1000 fsize 10 lw 1 fontscale 1 mousing
+#set output 'plot.html'
+set terminal svg enhanced font "arial,10" size 1000, 1000 
+set output 'plot.svg'
+""" + base_contents
+			html_contents = """
+#set terminal svg enhanced font "arial,10" size 1000, 1000 
+#set output 'plot.svg'
+set terminal canvas  solid butt size 1000,1000 fsize 10 lw 1 fontscale 1 mousing
+set output 'plot.html'
+""" + base_contents
+			plotf.write(html_contents)
+
 
 
 def _printrunner(ctx, runner):

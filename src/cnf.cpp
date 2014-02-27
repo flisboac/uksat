@@ -32,7 +32,7 @@ int uksat::CnfFormula::getnclauses() const {
 
 
 const std::vector<int>& uksat::CnfFormula::operator[](int clauseidx) const {
-	return clauses.at(clauseidx);
+	return clauses[clauseidx];
 }
 
 bool uksat::CnfFormula::isvalid() const {

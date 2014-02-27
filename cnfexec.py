@@ -72,6 +72,9 @@ def _getplotstats(complist):
 
 	return stats
 
+def _writecsvheader(f):
+	f.write("# chktime; opttime; deltatime; optcode; chkcode; filename\n")
+
 
 def _writecsv(filename, stats):
 	with open(filename, 'w') as f:
@@ -79,16 +82,9 @@ def _writecsv(filename, stats):
 
 
 def _writecsvfile(f, stats):
-	f.write("# chktime; opttime; deltatime; optcode; chkcode; filename\n")
+	_writecsvheader(f)
 	for comp in stats['wins'] + stats['passes']:
-		f.write("%f; %f; %f; %d; %d; %s\n" % (
-			comp.optrunner.time,
-			comp.chkrunner.time,
-			comp.deltatime,
-			comp.optrunner.exitcode,
-			comp.chkrunner.exitcode,
-			comp.inputpath)
-		)
+		_writecsvcomp(f, comp)
 
 
 def _writeplottpl(filename, stats):
@@ -98,6 +94,17 @@ def _writeplottpl(filename, stats):
 
 def _writeplottplfile(f, stats):
 	f.write(GnuPlotTemplate % stats)
+
+
+def _writecsvcomp(f, comp):
+	f.write("%f; %f; %f; %d; %d; %s\n" % (
+		comp.optrunner.time,
+		comp.chkrunner.time,
+		comp.deltatime,
+		comp.optrunner.exitcode,
+		comp.chkrunner.exitcode,
+		comp.inputpath)
+	)
 
 
 class Runner(object):
@@ -454,6 +461,7 @@ class RunnerComparer(object):
 class RunnerBatch(object):
 	def __init__(self, *pathnames, **options):
 		import cnfstat
+		self.datafile = None
 		self.pathnames = pathnames
 		self.options = options
 		self.reader = cnfstat.FastCnfReader(*pathnames, **options)
@@ -467,6 +475,7 @@ class RunnerBatch(object):
 		}
 		self.maxrunners = options.get('maxrunners', 1)
 	def run(self):
+		if self.datafile: _writecsvheader(self.datafile)
 		self.runners = []
 		totalformulae = len(self.formulae)
 		formulaidx = 0
@@ -494,13 +503,15 @@ class RunnerBatch(object):
 					runners.remove(finished_runner)
 					self.onfinishedrunner(finished_runner)
 					self.runners.append(finished_runner)
+					if self.datafile and finished_runner.isgood(): _writecsvcomp(self.datafile, finished_runner)
 			time.sleep(0.1)
 	def onfinishedrunner(self, runner):
 		if 'onfinishedrunner' in self.options:
 			return self.options['onfinishedrunner'](runner)
 	def writeplotfiles(self):
 		stats = _getplotstats(self.runners)
-		_writecsv(stats['datafilename'], stats)
+		if not self.datafile:
+			_writecsv(stats['datafilename'], stats)
 		_writeplottpl(stats['plotfilename'], stats)
 
 

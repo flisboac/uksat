@@ -127,8 +127,9 @@ int uksat::WatchedDpllSolver::registerwatches() {
 std::pair<int, int> uksat::WatchedDpllSolver::findwatchvars(std::size_t clauseidx, int knownvar) {
     std::pair<int, int> vars(0, 0), truevars(0, 0), undefvars(0, 0);
     std::vector<int>::const_iterator iv = formula[clauseidx].begin();
+    std::vector<int>::const_iterator end = formula[clauseidx].end();
     
-    while (iv != formula[clauseidx].end()) {
+    while (iv != end) {
         int var = *iv;
         
         if (var != knownvar) {
