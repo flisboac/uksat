@@ -124,6 +124,23 @@ int uksat::WatchedDpllSolver::registerwatches() {
 }
 
 
+int uksat::WatchedDpllSolver::findwatchvar(std::size_t clauseidx, int knownvar) {
+    int truevar = 0, undefvar = 0;
+    std::vector<int>::const_iterator iv = formula[clauseidx].begin();
+    std::vector<int>::const_iterator end = formula[clauseidx].end();
+    
+    while (iv != end && !undefvar) {
+        int var = *iv;
+        if (var != knownvar && partial.sat(var) >= 0) {
+            undefvar = var;
+        }
+        iv++;
+    }
+    
+    return undefvar;
+}
+
+
 std::pair<int, int> uksat::WatchedDpllSolver::findwatchvars(std::size_t clauseidx, int knownvar) {
     std::pair<int, int> vars(0, 0), truevars(0, 0), undefvars(0, 0);
     std::vector<int>::const_iterator iv = formula[clauseidx].begin();
@@ -340,18 +357,18 @@ void uksat::WatchedDpllSolver::trigger(int var) {
         }
         
         // Check the truth value of othervar
-        std::pair<int, int> vars = findwatchvars(clauseidx, *potherpos);
+        int newvar = findwatchvar(clauseidx, *potherpos);
         
-        if (vars.first && vars.first != *pwatchpos) {
+        if (newvar && newvar != *pwatchpos) {
             uksat_LOG_(LOG_TRIGGER_DO, "Watch"
                 << " clauseidx = " << clauseidx
                 << ", watchidx = " << posidx
-                << ", newvar = " << vars.first
+                << ", newvar = " << newvar
                 << ", oldvar = " << *pwatchpos
                 << ", othervar = " << *potherpos
             );
-            watch(clauseidx, vars.first, *pwatchpos);
-            int newvartruth = partial.sat(vars.first);
+            watch(clauseidx, newvar, *pwatchpos);
+            int newvartruth = partial.sat(newvar);
             
             if (newvartruth > 0) {
                 if (!isvalidclausesat(clauseidx)) {
@@ -381,25 +398,6 @@ void uksat::WatchedDpllSolver::trigger(int var) {
                 );
                 throw std::exception();
                 
-            } else {
-                if (!vars.second) {
-                    int secondvartruth = partial.sat(*potherpos);
-                    
-                    if (secondvartruth < 0) {
-                        // The only other variable found was an unassigned one. This
-                        // means that this variable is the only one eligible for
-                        // watching. In other words, all other variables are false,
-                        // and therefore, can be propagated.
-                        uksat_LOG_(LOG_PROPAG_UNIT,
-                            "clauseidx = " << clauseidx
-                            << ", deducedvar = " << vars.first
-                            << ", watchidx = " << posidx
-                            << ", watchvar = " << *pwatchpos
-                        );
-                        eraseclausesat(clauseidx); // The assignment will be done on the next push
-                        push(vars.first);
-                    }
-                }
             }
             it = invwatchset.begin();
             continue;

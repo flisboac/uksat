@@ -4,8 +4,21 @@
 #include <sstream>
 #include <string>
 #include <ctime>
+#include <algorithm>
 
 #include "uksat.hpp"
+
+static bool varfreq_less(const std::pair<int, int>& a, const std::pair<int, int>& b) {
+    int norm_a = uksat_NORMALLIT(a.first);
+    int norm_b = uksat_NORMALLIT(b.first);
+    return b.second < a.second || (b.second == a.second && norm_a < norm_b);
+}
+
+struct VarFreq_Less {
+    bool operator()(const std::pair<int, int>& a, const std::pair<int, int>& b) {
+        return varfreq_less(a, b);
+    }
+};
 
 uksat::CnfFormula::CnfFormula() : nvars(0), nclauses(0) {
 
@@ -28,6 +41,25 @@ int uksat::CnfFormula::getnvars() const {
 
 int uksat::CnfFormula::getnclauses() const {
 	return nclauses;
+}
+
+
+int uksat::CnfFormula::totalfrequency(int normvar) const {
+    int normalizedvar = uksat_NORMALLIT(normvar);
+    return frequency(normalizedvar) + frequency(-normalizedvar);
+}
+
+
+int uksat::CnfFormula::frequency(int var) const {
+    std::map<int, int>::const_iterator var_it = varfrequencies.find(var);
+    int total = 0;
+    if (var_it != varfrequencies.end())  total = var_it->second;
+    return total;
+}
+
+
+const std::vector<int>& uksat::CnfFormula::getvarorder() const {
+    return varorder;
 }
 
 
@@ -62,6 +94,7 @@ bool uksat::CnfFormula::openfile(std::istream& is) {
 	nclauses = 0;
 	nvars = 0;
 	clauses.clear();
+    std::map<int, int> vartotals;
 
 	std::string buf;
 
@@ -112,8 +145,24 @@ bool uksat::CnfFormula::openfile(std::istream& is) {
                                 
                     } else if (var) {
                         clauses.at(clauses.size() - 1).push_back(var);
+                        std::map<int, int>::iterator it = varfrequencies.find(var);
+                        std::map<int, int>::iterator norm_it = vartotals.find(uksat_NORMALLIT(var));
+                        
+                        if (it != varfrequencies.end()) {
+                            it->second++;
+                            
+                        } else {
+                            varfrequencies[var] = 1;
+                        }
+                        
+                        if (norm_it != vartotals.end()) {
+                            norm_it->second++;
+                            
+                        } else {
+                            vartotals[uksat_NORMALLIT(var)] = 1;
+                        }
                     }
-
+                    
                 } while (ss.good() || var != 0);
 
                 if (clauses[clauses.size() - 1].empty()) {
@@ -173,6 +222,33 @@ bool uksat::CnfFormula::openfile(std::istream& is) {
             nvars = 0;
             clauses.clear();
             ret = false;
+        } else {
+            // Ordering variables by frequency
+            std::set<std::pair<int, int>, VarFreq_Less> ordvars;
+            
+            for (std::map<int, int>::iterator it = vartotals.begin(); it != vartotals.end(); ++it) {
+                ordvars.insert(*it);
+            }
+            
+            for (std::set<std::pair<int, int>, VarFreq_Less>::iterator it = ordvars.begin(); it != ordvars.end(); ++it) {
+                int pushvar = it->first;
+                if (frequency(-pushvar) > frequency(pushvar)) {
+                    pushvar = -pushvar;
+                }
+                
+                varorder.push_back(pushvar);
+#if 0
+                if (varorder.empty()) {
+                    varorder.push_back(pushvar);
+                    
+                } else {
+                    int lastvar = uksat_NORMALLIT(*varorder.rbegin());
+                    if (lastvar != uksat_NORMALLIT(pushvar)) {
+                        varorder.push_back(pushvar);
+                    }
+                }
+#endif
+            }
         }
         
 	} else {

@@ -278,7 +278,12 @@ uksat::Solver::choosefreevar() {
     int var = 0;
     
     if (partial.size() < formula.getnvars()) {
-        for (int v = 1; v <= formula.getnvars(); v++) {
+        //for (int v = 1; v <= formula.getnvars(); v++) {
+        for (std::vector<int>::const_iterator it = formula.getvarorder().begin(); it != formula.getvarorder().end(); ++it) {
+            // TODO: In the future, devise a way to denote whether the reverse
+            // polarity of a variable was used, so that the algorithm can start
+            // with negated values as well.
+            int v = uksat_NORMALLIT(*it);
             if (!partial.isassigned(v)) {
                 var = v;
                 break;

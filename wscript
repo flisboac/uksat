@@ -64,13 +64,13 @@ BUILDS = {
 
 	'release': {
 		'all': {
-			'cxxflags': ['-O2']
+			'cxxflags': ['-O2', '-s']
 		}
 	},
 
 	'profile': {
 		'all': {
-			'cxxflags': ['-pg', '-O2', '-g']
+			'cxxflags': ['-O2', '-g']
 		},
 	}
 }

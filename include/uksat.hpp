@@ -199,6 +199,9 @@ public:
 
 	int getnvars() const;
 	int getnclauses() const;
+    int totalfrequency(int normvar) const;
+    int frequency(int var) const;
+    const std::vector<int>& getvarorder() const;
 	const std::vector<int>& operator[](int clauseidx) const;
 
 	bool isvalid() const;
@@ -212,6 +215,8 @@ private:
 	int nvars;
 	int nclauses;
 	std::vector<std::vector<int> > clauses;
+    std::map<int, int> varfrequencies;
+    std::vector<int> varorder;
 };
 
 
@@ -365,6 +370,7 @@ protected:
 	virtual int pop(std::vector<int>& poppedvars);
     
     virtual int registerwatches();
+    int findwatchvar(std::size_t clauseidx, int knownvar = 0);
     virtual std::pair<int, int> findwatchvars(std::size_t clauseidx, int knownvar = 0);
     
     virtual void watch(std::size_t clauseidx, int var, int substvar = 0);

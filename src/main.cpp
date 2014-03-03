@@ -463,6 +463,17 @@ void printsummary(ArgState& arg, uksat::CnfFormula& cnf, uksat::Solver& partial)
 	std::cerr << "FORMULA:" << std::endl;
 	std::cerr << "\tnumclauses: " << cnf.getnclauses() << std::endl;
 	std::cerr << "\tnumvars: " << cnf.getnvars() << std::endl;
+    std::cerr << "\tVariable Ordering: ";
+    const char* sep = "";
+    for (std::vector<int>::const_iterator it = cnf.getvarorder().begin(); it != cnf.getvarorder().end(); ++it) {
+        int var = *it;
+        int normvar = uksat_NORMALLIT(*it);
+        int normfreq = cnf.frequency(normvar);
+        int invfreq = cnf.frequency(-normvar);
+        std::cerr << sep << var << " (" << (normfreq + invfreq) << ": " << normvar << " = " << normfreq << ", " << -normvar << " = " << invfreq << ")";
+        sep = ", ";
+    }
+    std::cerr << std::endl << std::endl;
 }
 
 void printresults(ArgState& arg, uksat::CnfFormula& cnf, uksat::Solver& solver) {

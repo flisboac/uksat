@@ -211,8 +211,9 @@ uksat::SimpleDpllSolver::propagateclause(std::size_t clauseidx) {
     int undefvar = 0;
     int nundefs = 0;
     std::vector<int>::const_iterator iv = formula[clauseidx].begin();
+    std::vector<int>::const_iterator end = formula[clauseidx].end();
     
-    while ((clausesat <= 0) && iv != formula[clauseidx].end()) {
+    while ((clausesat <= 0) && iv != end) {
         int var = *iv;
         int vartruth = partial.sat(var);
         if (!vartruth) {
