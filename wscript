@@ -123,6 +123,7 @@ class BatchContext(BuildContext):
 	cmd = 'batch'
 	fun = 'batch'
 def batch(ctx):
+	"""Executes batch tests using formulae loaded from a specified folder."""
 	import cnfexec
 	from cnfexec import RunnerBatch, UksatRunner, UksatNowatchRunner, MinisatRunner
 	from cnfexec import GnuPlotData
@@ -185,6 +186,8 @@ def graph(ctx):
 
 
 def parselog_full(ctx):
+	"""Parses the results from the batch's log file, and outputs a new data file to be consumed by gnuplot.
+	Should not exist, will be removed in the future!"""
 	import re
 	import os, sys
 	good_pat = re.compile(r"WIN|PASS")

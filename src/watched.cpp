@@ -57,8 +57,16 @@ void uksat::WatchedDpllSolver::push(int var, bool decision) {
 }
 
 
-int uksat::WatchedDpllSolver::pop(std::vector<int>& poppedvars) {
-    int invertedvar = SimpleDpllSolver::pop(poppedvars);
+void
+uksat::WatchedDpllSolver::push(const std::pair<int, bool>& decision) {
+    SimpleDpllSolver::push(decision);
+    if (intime()) trigger(decision.first);
+}
+
+
+std::pair<int, bool>
+uksat::WatchedDpllSolver::pop(std::vector<int>& poppedvars) {
+    std::pair<int, bool> invertedvar = SimpleDpllSolver::pop(poppedvars);
     for (std::vector<int>::iterator it = poppedvars.begin(); it != poppedvars.end(); it++) {
         int poppedvar = *it;
         undotrigger(poppedvar);

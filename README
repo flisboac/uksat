@@ -1,0 +1,82 @@
+uksat v0.2.0 - A simple SAT Solver
+by Flávio Lisbôa <fl81@kent.ac.uk>
+
+BUILD PROCESS
+-------------
+
+The project uses waf, a build tool written in Python. Build scripts are written
+in Python, in a file named wscript. The user is advised to not modify the
+script files, but to instead use the options given by waf itself. Please refer
+to <https://code.google.com/p/waf/> for more details.
+
+waf should be able to identify your default C++ compiler even if it is not
+explicitly provided with the `--compiler` flag. uksat will compile with any
+reasonably modern compiler. If any problems arise, please contact me.
+
+Basically, waf has a process of configuration followed by building. Each
+argument is a specific command that will be executed in series. To build, call:
+
+$ ./waf configure build
+
+If Python is not on your PATH, use:
+
+$ path/to/python ./waf configure build
+
+Other useful commands:
+
+$ ./waf clean                       # Deletes binaries
+$ ./waf distclean                   # Deletes the binaries and current config
+$ ./waf install --prefix=./install  # For testing an installation on pwd
+$ ./waf dist                        # creates a tarball of the project's sources
+
+Optionally, a Makefile is provided, such that simply executing `make` on the
+project folder should be sufficient to configure and build. Please refer to
+`./waf --help` for a summary of commands and options.
+
+
+TESTING
+-------
+
+Once the project is built, the build results will be in a folder called "build".
+You will then be able to execute it from now on, and there is no specific
+dependency on any shared library (apart from system-provided ones, or those
+enforced by your compiler). A test batch can be executed with the command:
+
+$ ./waf batch -F folder
+
+Where folder is any file or path to a folder containing CNF formula files with
+extensions *.dimacs or *.cnf. The command will look up for such formulae
+recursively, count and order them by variable/clause size, and then execute
+tests the tests. The results will be output to the stdout stream. Two
+additional files for graph generation will also be output on the current folder,
+plot.gnu and plot.dat. During the batch process, a copy of the built uksat
+executable is used, so it is totally safe to alter the source code and
+recompile, this won't alter the results of the batch process.
+
+PLEASE ignore plot.dat, it is being incorrectly generated! Instead, redirect
+batch output to a file and run the "parselog_full"command, as in:
+
+$ ./waf batch -F folder > batch.log
+$ ./waf parselog_full -F batch.log
+
+After that, to generate the benchmark graphs, do:
+
+$ gnuplot plot.gnu
+
+Or:
+
+$ ./waf graph
+
+Alter plot.gnu as needed.
+
+
+DEPENDENCIES
+------------
+
+Configuration (tool) dependencies:
+- minisat
+- gnuplot
+- diff
+
+Build (library) dependencies:
+- (none)

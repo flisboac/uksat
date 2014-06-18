@@ -336,8 +336,9 @@ protected:
 	virtual int  decide();
 	virtual int  backtrack();
 	virtual void push(int var, bool decision = false);
-    virtual int pop();
-	virtual int pop(std::vector<int>& poppedvars);
+	virtual void push(const std::pair<int, bool>& decision);
+    virtual std::pair<int, bool> pop();
+	virtual std::pair<int, bool> pop(std::vector<int>& poppedvars);
     virtual int propagateclause(std::size_t clauseidx);
     virtual void printdecisions();
 
@@ -345,7 +346,7 @@ protected:
     std::size_t ncalls;
     
     // Stack
-	std::vector<int> decisions;
+	std::vector<std::pair<int, bool> > decisions;
 	std::vector<std::pair<int, int> > propagations;
 };
 
@@ -367,10 +368,11 @@ protected:
 	virtual void propagate();
     
 	virtual void push(int var, bool decision = false);
-	virtual int pop(std::vector<int>& poppedvars);
+	virtual void push(const std::pair<int, bool>& decision);
+	virtual std::pair<int, bool> pop(std::vector<int>& poppedvars);
     
     virtual int registerwatches();
-    int findwatchvar(std::size_t clauseidx, int knownvar = 0);
+    virtual int findwatchvar(std::size_t clauseidx, int knownvar = 0);
     virtual std::pair<int, int> findwatchvars(std::size_t clauseidx, int knownvar = 0);
     
     virtual void watch(std::size_t clauseidx, int var, int substvar = 0);

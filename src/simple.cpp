@@ -19,7 +19,7 @@ int uksat::SimpleDpllSolver::currtime() {
 
 
 int uksat::SimpleDpllSolver::currvar() {
-    return decisions.empty() ? 0 : *(decisions.rbegin());
+    return decisions.empty() ? 0 : decisions.rbegin()->first;
 }
 
 
@@ -115,7 +115,7 @@ uksat::SimpleDpllSolver::decide() {
     int var = choosefreevar();
     if (var) {
         uksat_LOG_(LOG_DECIDE_FREEVAR, "var = " << var);
-        push(var, true);
+        push(std::pair<int, bool>(var, false));
     } else {
         var = backtrack();
     }
@@ -125,14 +125,14 @@ uksat::SimpleDpllSolver::decide() {
 
 int
 uksat::SimpleDpllSolver::backtrack() {
-    int var = pop();
-    if (var) {
-        uksat_LOG_(LOG_BACK_OK, "var = " << var);
+    std::pair<int, bool> var = pop();
+    if (var.first) {
+        uksat_LOG_(LOG_BACK_OK, "var = " << var.first);
         // NOTE: THAT'S TRICKY! Must finish BEFORE pushing b/c watched literals!
         finish(0);
-        push(var, true);
+        push(var);
     }
-    return var;
+    return var.first;
 }
 
 
@@ -145,7 +145,7 @@ uksat::SimpleDpllSolver::push(int var, bool decision) {
     );
     
     if (decision) {
-        decisions.push_back(var);
+        decisions.push_back(std::pair<int, bool>(var, var < 0 ? true : false));
     } else {
         propagations.push_back(std::pair<int, int>(var, currtime()));
     }
@@ -153,42 +153,56 @@ uksat::SimpleDpllSolver::push(int var, bool decision) {
 }
 
 
-int
+void
+uksat::SimpleDpllSolver::push(const std::pair<int, bool>& decision) {
+    uksat_LOG_(LOG_STACK_PUSH,
+        "var = " << decision.first
+        << ", isdecision = 1"
+        << ", inverse = " << decision.second
+        << ", currtime = " << currtime()
+    );
+    
+    decisions.push_back(decision);
+    partial.push(decision.first, decision.second < 0 ? -currtime() : currtime());
+}
+
+
+std::pair<int, bool>
 uksat::SimpleDpllSolver::pop() {
     std::vector<int> dummy;
-    int invertedvar = pop(dummy);
+    std::pair<int, bool> invertedvar = pop(dummy);
     return invertedvar;
 }
 
 
-int
+std::pair<int, bool>
 uksat::SimpleDpllSolver::pop(std::vector<int>& poppedvars) {
-    int invertedvar = 0;
+    std::pair<int, bool> invertedvar(0, true);
     
     uksat_LOGMARK_(LOG_STACK_POP_PRE);
     
     if (!decisions.empty()) {
         int vartime = currtime();
-        int var = 0;//decisions.size();
+        std::pair<int, bool> var(0, false);//decisions.size();
         
-        for (std::vector<int>::reverse_iterator it = decisions.rbegin(); it != decisions.rend(); it++) {
+        for (std::vector<std::pair<int, bool> >::reverse_iterator it = decisions.rbegin(); it != decisions.rend(); it++) {
             var = *it;
-            uksat_LOG_(LOG_STACK_POPVAR, "isdecision = 1, var = " << var << ", vartime = " << vartime);
-            partial.unassign(var);
-            poppedvars.push_back(var);
-            if (var > 0) break;
+            uksat_LOG_(LOG_STACK_POPVAR, "isdecision = 1, var = " << var.first << ", vartime = " << vartime << ", inverted = " << var.second);
+            partial.unassign(var.first);
+            poppedvars.push_back(var.first);
+            if (!var.second) break;
             vartime--;
         }
 
         if (vartime) {
             decisions.resize(vartime - 1);
             int newsize = propagations.size();
-            invertedvar = -var;
+            invertedvar = std::pair<int, bool>(-(var.first), true);
 
             for (std::vector<std::pair<int, int> >::reverse_iterator it = propagations.rbegin();
                     it != propagations.rend() && it->second >= vartime;
                     it++, newsize--) {
-                uksat_LOG_(LOG_STACK_POPVAR, "isdecision = 0, var = " << it->first << ", vartime = " << vartime);
+                uksat_LOG_(LOG_STACK_POPVAR, "isdecision = 0, var = " << it->first << ", vartime = " << it->second);
                 partial.unassign(it->first);
                 poppedvars.push_back(it->first);
             }
@@ -198,7 +212,7 @@ uksat::SimpleDpllSolver::pop(std::vector<int>& poppedvars) {
     }
     
     uksat_LOG_(LOG_STACK_POP,
-        "invertedvar = " << invertedvar
+        "invertedvar = " << invertedvar.first
         << ", ndecisions = " << decisions.size()
         << ", npropagations = " << propagations.size());
     return invertedvar;
@@ -251,17 +265,16 @@ void uksat::SimpleDpllSolver::printdecisions() {
     ls << "CALL " << ncalls << ", TIME " << currtime() << ", NPROPAGS " << propagations.size() << ": ";
 
     const char* sep = "";
-    for (std::vector<std::pair<int, int> >::iterator it = propagations.begin(); it != propagations.end(); it++) {
-        if (it->second == 0) ls << sep << it->first << "(" << it->second << ")";
-        sep = ", ";
-    }
-
-    sep = "";
-    for (int time = 1; time <= decisions.size(); time++) {
-        ls << sep << decisions[time - 1] << "(" << time << ")";
-        sep = ", ";
+    for (int time = 0; time <= decisions.size(); ++time) {
+        if (time) {
+            ls << sep << "(" << (decisions[time - 1].second ? "! " : "") << decisions[time - 1].first <<  "." << time << ")";
+            sep = ", ";
+        }
+        
         for (std::vector<std::pair<int, int> >::iterator it = propagations.begin(); it != propagations.end(); it++) {
-            if (it->second == time) ls << sep << it->first << "(0)";
+            if (it->second == time) 
+                ls << sep << it->first << "." << it->second;
+            sep = ", ";
         }
     }
 

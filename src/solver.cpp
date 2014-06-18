@@ -283,7 +283,7 @@ uksat::Solver::choosefreevar() {
             // TODO: In the future, devise a way to denote whether the reverse
             // polarity of a variable was used, so that the algorithm can start
             // with negated values as well.
-            int v = uksat_NORMALLIT(*it);
+            int v = *it;
             if (!partial.isassigned(v)) {
                 var = v;
                 break;
